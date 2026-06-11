@@ -3551,6 +3551,43 @@ const DATA = [
     notes:"Range extender ICE engine only — tiny 2-cylinder. Very low oil capacity. Replace crush washer each service." },
   { make:"BMW", model:"i8", year:"2014-2020", engine:"1.5L 3-Cyl Turbo PHEV", torque:18, socket:"17mm", bolt:"M12×1.5", washer:true,
     notes:"PHEV — service ICE engine oil only. Tiny 3-cylinder. Replace crush washer each service." },
+
+  // ═══════════════════════════════════════════════════════════
+  // SCION — all Toyota platform; M14×1.5 / 14mm socket
+  // Exception: FR-S (Subaru FA20 boxer) = M14×1.5 / 17mm / 31 ft-lb
+  // iA (Mazda2-based) = M14×1.5 / 14mm / 26 ft-lb (Mazda spec)
+  // Source: Toyota/Scion OEM data, scionlife.com, ft86club.com
+  // ═══════════════════════════════════════════════════════════
+
+  { make:"Scion", model:"FR-S", year:"2013-2016", engine:"2.0L H4 (FA20)", torque:31, socket:"17mm", bolt:"M14×1.5", washer:true,
+    notes:"⚠ Subaru-sourced FA20 boxer engine — uses 17mm socket, different from all other Scion models. Replace crush washer each service. Same spec as Toyota GR86 / Subaru BRZ." },
+
+  { make:"Scion", model:"iA", year:"2016", engine:"1.5L 4-Cyl", torque:26, socket:"14mm", bolt:"M14×1.5", washer:true,
+    notes:"Mazda2-based platform (badge-engineered). Replace crush washer each service. Final Scion model year before brand discontinuation." },
+
+  { make:"Scion", model:"iC", year:"2005-2015", engine:"2.5L 4-Cyl (2AR-FE)", torque:30, socket:"14mm", bolt:"M14×1.5", washer:true,
+    notes:"Toyota Camry-based engine. Replace crush washer each service. Use 6-pt socket only." },
+
+  { make:"Scion", model:"iM", year:"2016", engine:"1.8L 4-Cyl (2ZR-FAE)", torque:27, socket:"14mm", bolt:"M14×1.5", washer:true,
+    notes:"Toyota Corolla-based. Replace crush washer each service. Final Scion model year — became Toyota Corolla iM in 2017." },
+
+  { make:"Scion", model:"iQ", year:"2012-2015", engine:"1.3L 4-Cyl (1NR-FE)", torque:22, socket:"14mm", bolt:"M14×1.5", washer:true,
+    notes:"Very small city car. Low torque spec — do NOT exceed. Replace crush washer each service." },
+
+  { make:"Scion", model:"tC", year:"2005-2016", engine:"2.4L / 2.5L 4-Cyl", torque:30, socket:"14mm", bolt:"M14×1.5", washer:true,
+    notes:"Replace crush washer each service. Use 6-pt socket only." },
+
+  { make:"Scion", model:"xA", year:"2004-2006", engine:"1.5L 4-Cyl (1NZ-FE)", torque:28, socket:"14mm", bolt:"M14×1.5", washer:true,
+    notes:"Aging vehicle — inspect plug threads on first service. Replace crush washer each service." },
+
+  { make:"Scion", model:"xB (1st gen)", year:"2004-2006", engine:"1.5L 4-Cyl (1NZ-FE)", torque:28, socket:"14mm", bolt:"M14×1.5", washer:true,
+    notes:"1st gen xB. Aging vehicle — inspect plug threads on first service. Replace crush washer each service." },
+
+  { make:"Scion", model:"xB (2nd gen)", year:"2008-2015", engine:"2.4L 4-Cyl (2AZ-FE)", torque:30, socket:"14mm", bolt:"M14×1.5", washer:true,
+    notes:"2nd gen xB — larger platform. Replace crush washer each service. Use 6-pt socket only." },
+
+  { make:"Scion", model:"xD", year:"2008-2015", engine:"1.5L / 1.8L 4-Cyl", torque:27, socket:"14mm", bolt:"M14×1.5", washer:true,
+    notes:"Toyota Yaris/Corolla platform. Replace crush washer each service." },
 ];
 
 // ── OLD BLOCK REMOVED — editor-aware versions below ──
