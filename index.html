@@ -118,9 +118,43 @@
   .btn-sug-apply:hover{opacity:.85}
   .sug-empty{text-align:center;padding:50px 20px;color:var(--muted)}
   .pending-dot{display:inline-block;background:#e05252;color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:.65rem;font-weight:800;border-radius:10px;padding:1px 6px;margin-left:6px;vertical-align:middle;min-width:18px;text-align:center}
+
+  /* ── LOGIN OVERLAY ── */
+  .login-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center}
+  .login-overlay.open{display:flex}
+  .login-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:32px 36px;width:100%;max-width:380px;text-align:center}
+  .login-box h2{font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+  .login-box p{font-size:.8rem;color:var(--muted);margin-bottom:22px}
+  .login-field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;text-align:left}
+  .login-field label{font-family:'Barlow Condensed',sans-serif;font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+  .login-field input{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Barlow',sans-serif;font-size:.9rem;padding:9px 12px;border-radius:6px;width:100%}
+  .login-field input:focus{outline:none;border-color:var(--accent)}
+  .btn-login{background:var(--accent);border:none;color:#0f1114;font-family:'Barlow Condensed',sans-serif;font-size:.88rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:11px 24px;border-radius:6px;cursor:pointer;width:100%;margin-top:6px;transition:opacity .15s}
+  .btn-login:hover{opacity:.85}
+  .btn-login:disabled{opacity:.5;cursor:not-allowed}
+  .login-err{color:#e05252;font-size:.78rem;margin-top:10px;min-height:18px}
+  .auth-status{display:flex;align-items:center;gap:8px;font-family:'Barlow Condensed',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .auth-dot{width:7px;height:7px;border-radius:50%;background:var(--border)}
+  .auth-dot.logged-in{background:var(--green)}
+  .btn-logout{background:none;border:1px solid var(--border);color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:4px;cursor:pointer}
+  .btn-logout:hover{border-color:#e05252;color:#e05252}
+  /* honeypot — invisible to humans */
+  .hp-field{position:absolute;left:-9999px;opacity:0;height:0;overflow:hidden}
 </style>
 </head>
 <body>
+
+<!-- LOGIN MODAL -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2>Admin Login</h2>
+    <p>Required to add, edit, or delete entries</p>
+    <div class="login-field"><label>Email</label><input type="email" id="login-email" autocomplete="username"/></div>
+    <div class="login-field"><label>Password</label><input type="password" id="login-password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    <button class="btn-login" id="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
 
 <!-- SUGGESTION MODAL -->
 <div class="modal-overlay" id="suggest-overlay" onclick="suggestOverlayClick(event)">
@@ -150,6 +184,8 @@
         <label>Your Name (optional)</label>
         <input id="s-name" placeholder="e.g. Mike" autocomplete="off"/>
       </div>
+      <!-- honeypot — bots fill this, humans don't -->
+      <div class="hp-field" aria-hidden="true"><input id="s-hp" tabindex="-1" autocomplete="off"/></div>
     </div>
     <p class="modal-hint">Suggestions go to the shop owner for review. They won't be published automatically.</p>
     <div class="modal-footer">
@@ -195,6 +231,11 @@
   <div class="header-text">
     <h1>Oil Drain Plug Reference</h1>
     <p>Torque Specs · Socket &amp; Plug Sizes · Tech Notes</p>
+  </div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+    <div class="auth-status"><span class="auth-dot" id="auth-dot"></span><span id="auth-label">Not signed in</span></div>
+    <button class="btn-logout" id="btn-logout" style="display:none" onclick="doLogout()">Sign Out</button>
+    <button class="btn-logout" id="btn-login-hdr" onclick="openLogin()" style="border-color:var(--accent);color:var(--accent)">Admin Login</button>
   </div>
 </header>
 
@@ -3524,127 +3565,182 @@ function renderTable(){
   empty.style.display='none';
   tbody.innerHTML=filtered.map((r,i)=>{
     const isCustom=!!r._id;
-    const actionBtns=isCustom
-      ?`<div class="row-actions">
-          <button class="btn-row" onclick="editEntry('${r._id}')">Edit</button>
-          <button class="btn-row btn-del" onclick="deleteEntry('${r._id}')">Delete</button>
-        </div>`
-      :`<button class="btn-row" onclick="duplicateAsCustom(${i})">Edit/Copy</button>`;
+    // Only show edit buttons when logged in
+    const actionBtns=isLoggedIn()
+      ?(isCustom
+        ?`<div class="row-actions">
+            <button class="btn-row" onclick="editEntry('${esc(r._id)}')">Edit</button>
+            <button class="btn-row btn-del" onclick="deleteEntry('${esc(r._id)}')">Delete</button>
+          </div>`
+        :`<button class="btn-row" onclick="duplicateAsCustom(${i})">Edit/Copy</button>`)
+      :'';
     return`<tr>
-      <td><span class="td-model">${r.make} ${r.model}</span>${isCustom?'<span class="custom-tag">CUSTOM</span>':''}</td>
-      <td style="white-space:nowrap;color:var(--label)">${r.year}</td>
-      <td style="color:var(--label);font-size:.83rem">${r.engine}</td>
-      <td><span class="torque-val">${r.torque}</span><span class="torque-unit">ft-lbs</span></td>
-      <td style="color:var(--text);font-weight:600">${r.socket||'—'}</td>
-      <td style="color:var(--text);font-weight:600;white-space:nowrap">${r.bolt||'—'}</td>
+      <td><span class="td-model">${esc(r.make)} ${esc(r.model)}</span>${isCustom?'<span class="custom-tag">CUSTOM</span>':''}</td>
+      <td style="white-space:nowrap;color:var(--label)">${esc(r.year)}</td>
+      <td style="color:var(--label);font-size:.83rem">${esc(r.engine)}</td>
+      <td><span class="torque-val">${esc(String(r.torque))}</span><span class="torque-unit">ft-lbs</span></td>
+      <td style="color:var(--text);font-weight:600">${esc(r.socket||'—')}</td>
+      <td style="color:var(--text);font-weight:600;white-space:nowrap">${esc(r.bolt||'—')}</td>
       <td><span class="badge ${r.washer?'badge-yes':'badge-no'}">${r.washer?'✓ Yes':'✗ No'}</span></td>
-      <td><span class="note-text">${r.notes||''}</span></td>
+      <td><span class="note-text">${esc(r.notes||'')}</span></td>
       <td>${actionBtns}</td>
     </tr>`;
   }).join('');
 }
 
 // ── SUPABASE CONFIG ──────────────────────────────────────────────────────────
-const SUPA_URL = 'https://ocbgwcnlgplnmweepxpm.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jYmd3Y25sZ3Bsbm13ZWVweHBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMjA5MTcsImV4cCI6MjA5NjY5NjkxN30.Mlz7YebGmTwr6TCB-L5wKquSlYbB9-uN5ELrq9SgNzc';
+const SUPA_URL='https://ocbgwcnlgplnmweepxpm.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jYmd3Y25sZ3Bsbm13ZWVweHBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMjA5MTcsImV4cCI6MjA5NjY5NjkxN30.Mlz7YebGmTwr6TCB-L5wKquSlYbB9-uN5ELrq9SgNzc';
 
-async function sbFetch(path, options={}){
-  const res = await fetch(SUPA_URL+'/rest/v1/'+path, {
-    headers:{
-      'apikey': SUPA_KEY,
-      'Authorization': 'Bearer '+SUPA_KEY,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation',
-      ...options.headers
-    },
-    ...options
-  });
-  if(!res.ok){
-    const err = await res.text();
-    throw new Error(err);
-  }
-  const text = await res.text();
-  return text ? JSON.parse(text) : [];
+// ── SUPABASE AUTH ────────────────────────────────────────────────────────────
+let currentSession = null;
+
+function isLoggedIn(){ return !!currentSession; }
+
+function openLogin(){
+  document.getElementById('login-err').textContent='';
+  document.getElementById('login-email').value='';
+  document.getElementById('login-password').value='';
+  document.getElementById('login-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('login-email').focus(),100);
 }
 
-let customEntries = [];
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const pw=document.getElementById('login-password').value;
+  const btn=document.getElementById('login-btn');
+  const err=document.getElementById('login-err');
+  if(!email||!pw){err.textContent='Please enter email and password.';return;}
+  btn.textContent='Signing in…';btn.disabled=true;err.textContent='';
+  try{
+    const res=await fetch(SUPA_URL+'/auth/v1/token?grant_type=password',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email,password:pw})
+    });
+    const data=await res.json();
+    if(!res.ok||!data.access_token) throw new Error(data.error_description||data.msg||'Login failed');
+    currentSession=data;
+    document.getElementById('login-overlay').classList.remove('open');
+    updateAuthUI();
+    refreshAll();
+    // Fire any deferred action that triggered the login prompt
+    if(_pendingCallback){
+      const cb=_pendingCallback;
+      _pendingCallback=null;
+      cb();
+    }
+  }catch(e){
+    err.textContent=e.message;
+  }finally{
+    btn.textContent='Sign In';btn.disabled=false;
+  }
+}
+
+async function doLogout(){
+  if(currentSession?.access_token){
+    await fetch(SUPA_URL+'/auth/v1/logout',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+currentSession.access_token}
+    }).catch(()=>{});
+  }
+  currentSession=null;
+  updateAuthUI();
+  refreshAll();
+}
+
+function updateAuthUI(){
+  const dot=document.getElementById('auth-dot');
+  const label=document.getElementById('auth-label');
+  const logoutBtn=document.getElementById('btn-logout');
+  const loginBtn=document.getElementById('btn-login-hdr');
+  if(isLoggedIn()){
+    dot.classList.add('logged-in');
+    label.textContent='Admin';
+    logoutBtn.style.display='inline-block';
+    loginBtn.style.display='none';
+  }else{
+    dot.classList.remove('logged-in');
+    label.textContent='Not signed in';
+    logoutBtn.style.display='none';
+    loginBtn.style.display='inline-block';
+  }
+}
+
+// Authenticated sbFetch — uses session token when logged in
+async function sbFetch(path,options={}){
+  const headers={
+    'apikey':SUPA_KEY,
+    'Content-Type':'application/json',
+    'Prefer':'return=representation',
+    ...options.headers
+  };
+  if(currentSession?.access_token)
+    headers['Authorization']='Bearer '+currentSession.access_token;
+  const res=await fetch(SUPA_URL+'/rest/v1/'+path,{...options,headers});
+  if(!res.ok){const e=await res.text();throw new Error(e);}
+  const t=await res.text();return t?JSON.parse(t):[];
+}
+
+// ── XSS ESCAPING ─────────────────────────────────────────────────────────────
+function esc(str){
+  if(str==null)return'';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#x27;');
+}
+
+// ── CUSTOM ENTRIES (Supabase) ─────────────────────────────────────────────────
+let customEntries=[];
 
 async function loadCustom(){
-  try {
-    const rows = await sbFetch('custom_entries?select=*&order=created_at.asc');
-    customEntries = rows.map(r=>({
-      _id: r.id,
-      make: r.make, model: r.model, year: r.year,
-      engine: r.engine, torque: r.torque,
-      socket: r.socket, bolt: r.bolt,
-      washer: r.washer, notes: r.notes
+  try{
+    const rows=await fetch(SUPA_URL+'/rest/v1/custom_entries?select=*&order=created_at.asc',{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    }).then(r=>r.json());
+    customEntries=rows.map(r=>({
+      _id:r.id,make:r.make,model:r.model,year:r.year,
+      engine:r.engine,torque:r.torque,socket:r.socket,
+      bolt:r.bolt,washer:r.washer,notes:r.notes
     }));
-  } catch(e){
-    console.error('Supabase load error:', e);
-    customEntries = [];
-  }
+  }catch(e){console.error('Load error:',e);customEntries=[];}
   return customEntries;
 }
 
 async function saveCustomEntry(entry){
-  const payload = {
-    make: entry.make, model: entry.model, year: entry.year,
-    engine: entry.engine, torque: entry.torque,
-    socket: entry.socket||'', bolt: entry.bolt||'',
-    washer: entry.washer, notes: entry.notes||''
-  };
-  if(entry._id && !entry._id.startsWith('c_')){
-    // Update existing Supabase row
-    await sbFetch('custom_entries?id=eq.'+entry._id, {
-      method:'PATCH',
-      body: JSON.stringify(payload)
-    });
-  } else {
-    // Insert new row
-    await sbFetch('custom_entries', {
-      method:'POST',
-      body: JSON.stringify(payload)
-    });
+  if(!isLoggedIn())throw new Error('Not logged in');
+  const payload={make:entry.make,model:entry.model,year:entry.year,
+    engine:entry.engine,torque:entry.torque,socket:entry.socket||'',
+    bolt:entry.bolt||'',washer:entry.washer,notes:entry.notes||''};
+  if(entry._id&&!entry._id.startsWith('c_')){
+    await sbFetch('custom_entries?id=eq.'+entry._id,{method:'PATCH',body:JSON.stringify(payload)});
+  }else{
+    await sbFetch('custom_entries',{method:'POST',body:JSON.stringify(payload)});
   }
 }
 
 async function deleteCustomEntry(id){
-  await sbFetch('custom_entries?id=eq.'+id, { method:'DELETE' });
+  if(!isLoggedIn())throw new Error('Not logged in');
+  await sbFetch('custom_entries?id=eq.'+id,{method:'DELETE'});
 }
 
-function getAllData(){
-  return [...DATA, ...customEntries];
-}
+function getAllData(){return[...DATA,...customEntries];}
 
 let editingId=null;
+let _pendingCallback=null;
 
-// ── PIN PROTECTION ────────────────────────────────────────────────────────
-const CORRECT_PIN='2713';
-let pinUnlocked=false;
-let pinTimer=null;
-
-function checkPin(callback){
-  if(pinUnlocked){callback();return;}
-  const pin=prompt('Enter PIN to edit:');
-  if(pin===null)return; // cancelled
-  if(pin===CORRECT_PIN){
-    pinUnlocked=true;
-    // Auto-lock after 5 minutes of inactivity
-    resetPinTimer();
-    callback();
-  } else {
-    alert('Incorrect PIN.');
-  }
-}
-
-function resetPinTimer(){
-  clearTimeout(pinTimer);
-  pinTimer=setTimeout(()=>{pinUnlocked=false;},5*60*1000);
+// ── REQUIRE LOGIN ─────────────────────────────────────────────────────────────
+function requireLogin(callback){
+  if(isLoggedIn()){callback();return;}
+  _pendingCallback=callback;
+  openLogin();
 }
 
 function openModal(prefill){
-  checkPin(()=>{
-    resetPinTimer();
+  requireLogin(()=>{
     editingId=null;
     document.getElementById('modal-title').textContent='Add Entry';
     document.getElementById('e-make').value=prefill?.make||'';
@@ -3662,11 +3758,10 @@ function openModal(prefill){
 }
 
 function editEntry(id){
-  checkPin(()=>{
-    resetPinTimer();
-    const custom=loadCustom();
-    const entry=custom.find(e=>e._id===id);
-    if(!entry)return;
+  requireLogin(()=>{
+    // Fix issue 3: use already-loaded customEntries array, not async loadCustom()
+    const entry=customEntries.find(e=>e._id===id);
+    if(!entry){alert('Entry not found.');return;}
     editingId=id;
     document.getElementById('modal-title').textContent='Edit Entry';
     document.getElementById('e-make').value=entry.make;
@@ -3683,11 +3778,8 @@ function editEntry(id){
 }
 
 function duplicateAsCustom(filteredIndex){
-  checkPin(()=>{
-    resetPinTimer();
+  requireLogin(()=>{
     const r=filtered[filteredIndex];
-    openModal._skipPin=true;
-    // bypass pin since already verified
     editingId=null;
     document.getElementById('modal-title').textContent='Add Entry';
     document.getElementById('e-make').value=r.make||'';
@@ -3704,64 +3796,36 @@ function duplicateAsCustom(filteredIndex){
   });
 }
 
-function closeModal(){
-  document.getElementById('modal-overlay').classList.remove('open');
-  editingId=null;
-}
-
-function overlayClick(e){
-  if(e.target===document.getElementById('modal-overlay'))closeModal();
-}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');editingId=null;}
+function overlayClick(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
 
 function saveEntry(){
+  if(!isLoggedIn()){alert('Please log in first.');openLogin();return;}
   const make=document.getElementById('e-make').value.trim();
   const model=document.getElementById('e-model').value.trim();
   const year=document.getElementById('e-year').value.trim();
   const engine=document.getElementById('e-engine').value.trim();
   const torqueRaw=document.getElementById('e-torque').value.trim();
-
-  if(!make||!model||!year||!engine||!torqueRaw){
-    alert('Please fill in all required fields: Make, Model, Year, Engine, and Torque.');
-    return;
-  }
+  if(!make||!model||!year||!engine||!torqueRaw){alert('Please fill in all required fields.');return;}
   const torque=parseFloat(torqueRaw);
   if(isNaN(torque)||torque<=0){alert('Torque must be a positive number.');return;}
-
-  const entry={
-    _id: editingId||('c_'+Date.now()),
-    make,model,year,engine,torque,
+  const entry={_id:editingId||('c_'+Date.now()),make,model,year,engine,torque,
     socket:document.getElementById('e-socket').value.trim(),
     bolt:document.getElementById('e-bolt').value.trim(),
     washer:document.getElementById('e-washer').value==='true',
-    notes:document.getElementById('e-notes').value.trim(),
-  };
-
-  const btn = document.querySelector('.btn-save');
-  btn.textContent='Saving…'; btn.disabled=true;
-
-  saveCustomEntry(entry).then(()=>{
-    return loadCustom();
-  }).then(()=>{
-    closeModal();
-    refreshAll();
-    btn.textContent='Save Entry'; btn.disabled=false;
-  }).catch(err=>{
-    alert('Error saving: '+err.message);
-    btn.textContent='Save Entry'; btn.disabled=false;
-  });
+    notes:document.getElementById('e-notes').value.trim()};
+  const btn=document.querySelector('.btn-save');
+  btn.textContent='Saving…';btn.disabled=true;
+  saveCustomEntry(entry).then(()=>loadCustom()).then(()=>{
+    closeModal();refreshAll();btn.textContent='Save Entry';btn.disabled=false;
+  }).catch(err=>{alert('Error saving: '+err.message);btn.textContent='Save Entry';btn.disabled=false;});
 }
 
 function deleteEntry(id){
-  checkPin(()=>{
-    resetPinTimer();
+  requireLogin(()=>{
     if(!confirm('Delete this custom entry?'))return;
-    deleteCustomEntry(id).then(()=>{
-      return loadCustom();
-    }).then(()=>{
-      refreshAll();
-    }).catch(err=>{
-      alert('Error deleting: '+err.message);
-    });
+    deleteCustomEntry(id).then(()=>loadCustom()).then(()=>refreshAll())
+      .catch(err=>alert('Error deleting: '+err.message));
   });
 }
 
@@ -3864,7 +3928,9 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeS
 
 // ── SUGGESTION BOX ────────────────────────────────────────────────────────
 function openSuggest(){
-  ['s-make','s-model','s-year','s-engine','s-notes','s-name'].forEach(id=>document.getElementById(id).value='');
+  ['s-make','s-model','s-year','s-engine','s-notes','s-name','s-hp'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
   document.getElementById('s-type').value='correction';
   document.getElementById('suggest-overlay').classList.add('open');
   document.getElementById('s-notes').focus();
@@ -3879,34 +3945,62 @@ function suggestOverlayClick(e){
 }
 
 async function submitSuggestion(){
+  // Issue 4 fix: Honeypot check — bots fill hidden field, humans don't
+  const hp=document.getElementById('s-hp');
+  if(hp&&hp.value.trim()){
+    // Bot detected — silently pretend success
+    closeSuggest();
+    return;
+  }
+
+  // Rate limiting — max 3 submissions per hour from same browser
+  const RL_KEY='sug_timestamps';
+  const now=Date.now();
+  const hour=60*60*1000;
+  let times=[];
+  try{times=JSON.parse(localStorage.getItem(RL_KEY)||'[]');}catch(e){}
+  times=times.filter(t=>now-t<hour); // keep only last hour
+  if(times.length>=3){
+    alert('You\'ve submitted several suggestions recently. Please wait a bit before submitting again.');
+    return;
+  }
+
   const notes=document.getElementById('s-notes').value.trim();
   if(!notes){alert('Please describe the suggestion or correction.');return;}
 
+  // Use anon key (no auth) for suggestions — intentionally public
   const payload={
-    type: document.getElementById('s-type').value,
-    make: document.getElementById('s-make').value.trim()||null,
-    model: document.getElementById('s-model').value.trim()||null,
-    year: document.getElementById('s-year').value.trim()||null,
-    engine: document.getElementById('s-engine').value.trim()||null,
-    details: notes,
-    submitted_by: document.getElementById('s-name').value.trim()||'Anonymous',
-    status: 'pending'
+    type:document.getElementById('s-type').value,
+    make:document.getElementById('s-make').value.trim()||null,
+    model:document.getElementById('s-model').value.trim()||null,
+    year:document.getElementById('s-year').value.trim()||null,
+    engine:document.getElementById('s-engine').value.trim()||null,
+    details:notes,
+    submitted_by:document.getElementById('s-name').value.trim()||'Anonymous',
+    status:'pending'
   };
 
   const btn=document.getElementById('suggest-save-btn');
-  btn.textContent='Submitting…'; btn.disabled=true;
+  btn.textContent='Submitting…';btn.disabled=true;
 
-  try {
-    await sbFetch('suggestions', {
+  try{
+    const res=await fetch(SUPA_URL+'/rest/v1/suggestions',{
       method:'POST',
-      body: JSON.stringify(payload)
+      headers:{'apikey':SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(payload)
     });
+    if(!res.ok) throw new Error(await res.text());
+    // Record this submission for rate limiting
+    times.push(now);
+    localStorage.setItem(RL_KEY,JSON.stringify(times));
     closeSuggest();
     alert('✓ Suggestion submitted! The shop owner will review it.');
-  } catch(err){
-    alert('Error submitting: '+err.message+'\n\nMake sure the suggestions table exists in Supabase.');
-  } finally {
-    btn.textContent='Submit'; btn.disabled=false;
+    // Refresh badge count
+    sbFetch('suggestions?select=id,status').then(rows=>{allSuggestions=rows;updatePendingBadge();}).catch(()=>{});
+  }catch(err){
+    alert('Error submitting: '+err.message);
+  }finally{
+    btn.textContent='Submit';btn.disabled=false;
   }
 }
 
@@ -3919,22 +4013,16 @@ function switchTab(tab){
   document.querySelectorAll('.tab-btn')[idx].classList.add('active');
   if(tab==='filter') renderCF();
   if(tab==='review'){
-    if(!pinUnlocked){
-      checkPin(()=>{
-        resetPinTimer();
-        loadSuggestions();
-      });
-      if(!pinUnlocked){
-        // pin was cancelled — revert to drain tab
-        document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-        document.getElementById('tab-drain').classList.add('active');
-        document.querySelectorAll('.tab-btn')[0].classList.add('active');
-        return;
-      }
-    } else {
-      loadSuggestions();
+    if(!isLoggedIn()){
+      // Revert to drain tab and prompt login
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.getElementById('tab-drain').classList.add('active');
+      document.querySelectorAll('.tab-btn')[0].classList.add('active');
+      openLogin();
+      return;
     }
+    loadSuggestions();
   }
 }
 
@@ -3968,34 +4056,35 @@ function renderReview(){
   const statusFilter=sf?sf.value:'pending';
   const rows=statusFilter?allSuggestions.filter(s=>s.status===statusFilter):allSuggestions;
   if(!rows.length){
-    list.innerHTML=`<div class="sug-empty">No ${statusFilter||''} suggestions.</div>`;
+    list.innerHTML=`<div class="sug-empty">No ${esc(statusFilter)||''} suggestions.</div>`;
     return;
   }
   const tClass={correction:'sug-type-correction',missing:'sug-type-missing',suggestion:'sug-type-suggestion'};
   const tLabel={correction:'Correction',missing:'Missing Entry',suggestion:'Suggestion'};
   list.innerHTML=rows.map(s=>{
     const date=new Date(s.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    const vehicle=[s.make,s.model,s.year,s.engine].filter(Boolean).join(' · ');
+    const vehicle=[s.make,s.model,s.year,s.engine].filter(Boolean).map(esc).join(' · ');
     const tc=tClass[s.type]||'sug-type-suggestion';
-    const tl=tLabel[s.type]||s.type;
+    const tl=esc(tLabel[s.type]||s.type);
+    const sid=esc(s.id);
     const statusBadge=s.status!=='pending'
-      ?`<span style="font-family:'Barlow Condensed',sans-serif;font-size:.65rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:4px;margin-left:6px;background:${s.status==='done'?'rgba(76,175,125,.15)':'rgba(136,144,160,.1)'};color:${s.status==='done'?'var(--green)':'var(--muted)'};">${s.status.toUpperCase()}</span>`
+      ?`<span style="font-family:'Barlow Condensed',sans-serif;font-size:.65rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:4px;margin-left:6px;background:${s.status==='done'?'rgba(76,175,125,.15)':'rgba(136,144,160,.1)'};color:${s.status==='done'?'var(--green)':'var(--muted)'};">${esc(s.status.toUpperCase())}</span>`
       :'';
     const actions=s.status==='pending'
       ?`<div class="sug-actions">
-          <button class="btn-sug-apply" onclick="markSuggestion('${s.id}','done')">✓ Mark Done</button>
-          <button class="btn-sug-dismiss" onclick="markSuggestion('${s.id}','dismissed')">✕ Dismiss</button>
+          <button class="btn-sug-apply" onclick="markSuggestion('${sid}','done')">✓ Mark Done</button>
+          <button class="btn-sug-dismiss" onclick="markSuggestion('${sid}','dismissed')">✕ Dismiss</button>
         </div>`
       :`<div class="sug-actions"><button class="btn-sug-dismiss" onclick="markSuggestion('${s.id}','pending')">↺ Reopen</button></div>`;
     return`<div class="sug-card" id="sug-${s.id}">
       <div class="sug-card-header">
         <div>
           <span class="sug-type ${tc}">${tl}</span>${statusBadge}
-          <div class="sug-meta">By ${s.submitted_by||'Anonymous'} · ${date}</div>
+          <div class="sug-meta">By ${esc(s.submitted_by||'Anonymous')} · ${date}</div>
         </div>
       </div>
       ${vehicle?`<div class="sug-vehicle">${vehicle}</div>`:''}
-      <div class="sug-details">${s.details}</div>
+      <div class="sug-details">${esc(s.details||'')}</div>
       ${actions}
     </div>`;
   }).join('');
