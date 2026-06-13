@@ -113,6 +113,7 @@
   .fgroup input:focus,.fgroup select:focus,.fgroup textarea:focus{outline:none;border-color:var(--accent)}
   .fgroup textarea{resize:vertical;min-height:72px;line-height:1.5}
   .fgroup select option{background:var(--surface2)}
+  .modal-hint{padding:0 22px 12px;font-size:.75rem;color:var(--muted);line-height:1.5}
   .modal-footer{padding:14px 22px 18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--surface)}
   .btn-save{background:var(--accent);border:none;color:#0f1114;font-family:'Barlow Condensed',sans-serif;font-size:.82rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:10px 24px;border-radius:6px;cursor:pointer}
   .btn-save:hover{opacity:.88}
@@ -144,7 +145,9 @@
   /* ── LOGIN OVERLAY ── */
   .login-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center}
   .login-overlay.open{display:flex}
-  .login-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:32px 36px;width:100%;max-width:380px;text-align:center}
+  .login-box{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:32px 36px;width:100%;max-width:380px;text-align:center}
+  .login-close{position:absolute;top:10px;right:14px;background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:2px 6px}
+  .login-close:hover{color:var(--text)}
   .login-box h2{font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
   .login-box p{font-size:.8rem;color:var(--muted);margin-bottom:22px}
   .login-field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;text-align:left}
@@ -167,8 +170,9 @@
 <body>
 
 <!-- LOGIN MODAL -->
-<div class="login-overlay" id="login-overlay">
+<div class="login-overlay" id="login-overlay" onclick="loginOverlayClick(event)">
   <div class="login-box">
+    <button class="login-close" onclick="closeLogin()" aria-label="Close">×</button>
     <h2>Admin Login</h2>
     <p>Required to add, edit, or delete entries</p>
     <div class="login-field"><label>Email</label><input type="email" id="login-email" autocomplete="username"/></div>
@@ -229,7 +233,7 @@
       <div class="fgroup"><label>Model *</label><input id="e-model" placeholder="e.g. Camry" autocomplete="off"/></div>
       <div class="fgroup"><label>Year Range *</label><input id="e-year" placeholder="e.g. 2018-2023 or 2020" autocomplete="off"/></div>
       <div class="fgroup"><label>Engine *</label><input id="e-engine" placeholder="e.g. 2.5L 4-Cyl" autocomplete="off"/></div>
-      <div class="fgroup"><label>Torque (ft-lbs) *</label><input id="e-torque" type="number" placeholder="e.g. 18" min="1" max="300"/></div>
+      <div class="fgroup"><label>Torque (ft-lbs) *</label><input id="e-torque" type="number" placeholder="e.g. 18" min="0" max="300"/></div>
       <div class="fgroup"><label>Socket Size</label><input id="e-socket" placeholder="e.g. 17mm" autocomplete="off"/></div>
       <div class="fgroup span2"><label>Drain Bolt Thread</label><input id="e-bolt" placeholder="e.g. M14×1.5" autocomplete="off"/></div>
       <div class="fgroup span2">
@@ -238,7 +242,7 @@
       </div>
       <div class="fgroup span2"><label>Tech Notes</label><textarea id="e-notes" placeholder="Optional — warnings, OEM part numbers, special instructions"></textarea></div>
     </div>
-    <p class="modal-hint">* Required fields. Custom entries are saved in this browser and marked <span style="color:var(--accent);font-weight:700">CUSTOM</span>. They persist across sessions.</p>
+    <p class="modal-hint">* Required fields. Custom entries are saved to the shared database, marked <span style="color:var(--accent);font-weight:700">CUSTOM</span>, and visible to all users.</p>
     <div class="modal-footer">
       <button class="btn-cancel-m" onclick="closeModal()">Cancel</button>
       <button class="btn-save" onclick="saveEntry()">Save Entry</button>
@@ -3624,20 +3628,22 @@ function renderTable(){
   empty.style.display='none';
   tbody.innerHTML=filtered.map((r,i)=>{
     const isCustom=!!r._id;
-    // Only show edit buttons when logged in
+    // Only show edit buttons when logged in.
+    // data-* + delegated listener instead of inline onclick: HTML-escaping is not
+    // safe inside a JS string literal (entities decode before the JS parses).
     const actionBtns=isLoggedIn()
       ?(isCustom
         ?`<div class="row-actions">
-            <button class="btn-row" onclick="editEntry('${esc(r._id)}')">Edit</button>
-            <button class="btn-row btn-del" onclick="deleteEntry('${esc(r._id)}')">Delete</button>
+            <button class="btn-row" data-act="edit" data-id="${esc(r._id)}">Edit</button>
+            <button class="btn-row btn-del" data-act="del" data-id="${esc(r._id)}">Delete</button>
           </div>`
-        :`<button class="btn-row" onclick="duplicateAsCustom(${i})">Edit/Copy</button>`)
+        :`<button class="btn-row" data-act="dup" data-idx="${i}">Edit/Copy</button>`)
       :'';
     return`<tr>
       <td><span class="td-model">${esc(r.make)} ${esc(r.model)}</span>${isCustom?'<span class="custom-tag">CUSTOM</span>':''}</td>
       <td style="white-space:nowrap;color:var(--label)">${esc(r.year)}</td>
       <td style="color:var(--label);font-size:.83rem">${esc(r.engine)}</td>
-      <td><span class="torque-val">${esc(String(r.torque))}</span><span class="torque-unit">ft-lbs</span></td>
+      <td>${r.torque?`<span class="torque-val">${esc(String(r.torque))}</span><span class="torque-unit">ft-lbs</span>`:'<span class="torque-unit" style="font-size:.8rem">N/A — see notes</span>'}</td>
       <td style="color:var(--text);font-weight:600">${esc(r.socket||'—')}</td>
       <td style="color:var(--text);font-weight:600;white-space:nowrap">${esc(r.bolt||'—')}</td>
       <td style="white-space:nowrap">${r.partNo?`<span style="font-family:'Barlow Condensed',sans-serif;font-size:.82rem;font-weight:700;color:var(--text);display:block">${esc(r.partNo)}</span><span style="font-size:.72rem;color:var(--muted)">${esc(r.sapNo)}</span>`:'<span style="color:var(--border)">—</span>'}</td>
@@ -3663,8 +3669,44 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 // ── SUPABASE AUTH ────────────────────────────────────────────────────────────
 let currentSession = null;
+const SESSION_KEY='sb_session';
+let _refreshTimer=null;
 
 function isLoggedIn(){ return !!currentSession; }
+
+function persistSession(s){try{localStorage.setItem(SESSION_KEY,JSON.stringify(s));}catch(e){}}
+function clearPersistedSession(){try{localStorage.removeItem(SESSION_KEY);}catch(e){}}
+
+// Supabase access tokens expire (~1h). Refresh a minute early so admin
+// sessions don't start failing mid-use with raw "JWT expired" errors.
+function setSession(data){
+  data.expires_at=data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600);
+  currentSession=data;
+  persistSession(data);
+  clearTimeout(_refreshTimer);
+  const ms=data.expires_at*1000-Date.now()-60000;
+  _refreshTimer=setTimeout(refreshSession,Math.max(ms,5000));
+}
+
+async function refreshSession(){
+  if(!currentSession?.refresh_token)return false;
+  try{
+    const res=await fetch(SUPA_URL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:currentSession.refresh_token})
+    });
+    const data=await res.json();
+    if(!res.ok||!data.access_token)throw new Error('refresh failed');
+    setSession(data);
+    return true;
+  }catch(e){
+    currentSession=null;
+    clearPersistedSession();
+    updateAuthUI();
+    return false;
+  }
+}
 
 function openLogin(){
   document.getElementById('login-err').textContent='';
@@ -3672,6 +3714,15 @@ function openLogin(){
   document.getElementById('login-password').value='';
   document.getElementById('login-overlay').classList.add('open');
   setTimeout(()=>document.getElementById('login-email').focus(),100);
+}
+
+function closeLogin(){
+  document.getElementById('login-overlay').classList.remove('open');
+  _pendingCallback=null;
+}
+
+function loginOverlayClick(e){
+  if(e.target===document.getElementById('login-overlay'))closeLogin();
 }
 
 async function doLogin(){
@@ -3689,7 +3740,7 @@ async function doLogin(){
     });
     const data=await res.json();
     if(!res.ok||!data.access_token) throw new Error(data.error_description||data.msg||'Login failed');
-    currentSession=data;
+    setSession(data);
     document.getElementById('login-overlay').classList.remove('open');
     updateAuthUI();
     refreshAll();
@@ -3714,6 +3765,8 @@ async function doLogout(){
     }).catch(()=>{});
   }
   currentSession=null;
+  clearPersistedSession();
+  clearTimeout(_refreshTimer);
   updateAuthUI();
   refreshAll();
 }
@@ -3737,7 +3790,7 @@ function updateAuthUI(){
 }
 
 // Authenticated sbFetch — uses session token when logged in
-async function sbFetch(path,options={}){
+async function sbFetch(path,options={},_retried){
   const headers={
     'apikey':SUPA_KEY,
     'Content-Type':'application/json',
@@ -3747,6 +3800,9 @@ async function sbFetch(path,options={}){
   if(currentSession?.access_token)
     headers['Authorization']='Bearer '+currentSession.access_token;
   const res=await fetch(SUPA_URL+'/rest/v1/'+path,{...options,headers});
+  if(res.status===401&&currentSession&&!_retried){
+    if(await refreshSession())return sbFetch(path,options,true);
+  }
   if(!res.ok){const e=await res.text();throw new Error(e);}
   const t=await res.text();return t?JSON.parse(t):[];
 }
@@ -3872,12 +3928,15 @@ function saveEntry(){
   if(!isLoggedIn()){alert('Please log in first.');openLogin();return;}
   const make=document.getElementById('e-make').value.trim();
   const model=document.getElementById('e-model').value.trim();
-  const year=document.getElementById('e-year').value.trim();
+  // Normalize en/em dashes and spaces — the year filter only parses "YYYY" or "YYYY-YYYY",
+  // so anything else would save fine but never show up in search results.
+  const year=document.getElementById('e-year').value.trim().replace(/[–—]/g,'-').replace(/\s+/g,'');
   const engine=document.getElementById('e-engine').value.trim();
   const torqueRaw=document.getElementById('e-torque').value.trim();
   if(!make||!model||!year||!engine||!torqueRaw){alert('Please fill in all required fields.');return;}
+  if(!/^\d{4}(-\d{4})?$/.test(year)){alert('Year must be a 4-digit year or a range like 2018-2023.');return;}
   const torque=parseFloat(torqueRaw);
-  if(isNaN(torque)||torque<=0){alert('Torque must be a positive number.');return;}
+  if(isNaN(torque)||torque<0){alert('Torque must be a positive number (use 0 for hand-tight / plastic drain plugs).');return;}
   const entry={_id:editingId||('c_'+Date.now()),make,model,year,engine,torque,
     socket:document.getElementById('e-socket').value.trim(),
     bolt:document.getElementById('e-bolt').value.trim(),
@@ -3970,6 +4029,21 @@ function refreshAll(){
   applyFilters();
 }
 
+// Restore persisted session so a page refresh doesn't log the admin out
+(function(){
+  let s=null;
+  try{s=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch(e){}
+  if(!s?.access_token)return;
+  currentSession=s;
+  if(s.expires_at&&s.expires_at*1000-Date.now()<60000){
+    // Token expired or about to — refresh before trusting it
+    refreshSession().then(ok=>{updateAuthUI();if(ok)refreshAll();});
+  }else{
+    setSession(s);
+    updateAuthUI();
+  }
+})();
+
 // Add an Actions column header
 document.querySelector('thead tr').insertAdjacentHTML('beforeend','<th>Actions</th>');
 
@@ -3979,6 +4053,19 @@ DATA.forEach(r=>yearsFromRow(r).forEach(y=>allYearsInit.add(y)));
 populateSelect('f-year',[...allYearsInit].sort((a,b)=>b-a),'All Years',false);
 
 ['f-year','f-make','f-model','f-engine'].forEach(id=>document.getElementById(id).addEventListener('change',applyFilters));
+
+// Delegated handlers for dynamically rendered row buttons
+document.getElementById('table-body').addEventListener('click',e=>{
+  const btn=e.target.closest('button[data-act]');
+  if(!btn)return;
+  if(btn.dataset.act==='edit')editEntry(btn.dataset.id);
+  else if(btn.dataset.act==='del')deleteEntry(btn.dataset.id);
+  else if(btn.dataset.act==='dup')duplicateAsCustom(+btn.dataset.idx);
+});
+document.getElementById('sug-list').addEventListener('click',e=>{
+  const btn=e.target.closest('button[data-id]');
+  if(btn)markSuggestion(btn.dataset.id,btn.dataset.status);
+});
 
 // Start with empty table and prompt
 filtered=[];
@@ -3993,7 +4080,7 @@ loadCustom().then(()=>{
 }).catch(()=>{});
 
 // Close modal on Escape key
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeSuggest();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeSuggest();closeLogin();}});
 
 // ── SUGGESTION BOX ────────────────────────────────────────────────────────
 function openSuggest(){
@@ -4160,10 +4247,10 @@ function renderReview(){
       :'';
     const actions=s.status==='pending'
       ?`<div class="sug-actions">
-          <button class="btn-sug-apply" onclick="markSuggestion('${sid}','done')">✓ Mark Done</button>
-          <button class="btn-sug-dismiss" onclick="markSuggestion('${sid}','dismissed')">✕ Dismiss</button>
+          <button class="btn-sug-apply" data-id="${sid}" data-status="done">✓ Mark Done</button>
+          <button class="btn-sug-dismiss" data-id="${sid}" data-status="dismissed">✕ Dismiss</button>
         </div>`
-      :`<div class="sug-actions"><button class="btn-sug-dismiss" onclick="markSuggestion('${sid}','pending')">↺ Reopen</button></div>`;
+      :`<div class="sug-actions"><button class="btn-sug-dismiss" data-id="${sid}" data-status="pending">↺ Reopen</button></div>`;
     return`<div class="sug-card" id="sug-${sid}">
       <div class="sug-card-header">
         <div>
@@ -4181,7 +4268,7 @@ function renderReview(){
 async function markSuggestion(id,status){
   try{
     await sbFetch('suggestions?id=eq.'+id,{method:'PATCH',body:JSON.stringify({status})});
-    const s=allSuggestions.find(s=>s.id===id);
+    const s=allSuggestions.find(s=>String(s.id)===String(id));
     if(s) s.status=status;
     updatePendingBadge();
     renderReview();
@@ -4309,7 +4396,7 @@ function renderCF(){
   const tbody=document.getElementById('cf-body');
   if(!rows.length){tbody.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
-  const pn=v=>v&&v!=='——'?`<span class="pn-cell">${v}</span>`:`<span class="pn-na">—</span>`;
+  const pn=v=>v&&v!=='——'?`<span class="pn-cell">${esc(v)}</span>`:`<span class="pn-na">—</span>`;
   tbody.innerHTML=rows.map(r=>`<tr>
     <td>${pn(r.sc)}</td>
     <td>${pn(r.fram)}</td>
