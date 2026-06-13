@@ -4101,7 +4101,8 @@ function suggestOverlayClick(e){
 }
 
 async function submitSuggestion(){
-  // Issue 4 fix: Honeypot check — bots fill hidden field, humans don't
+  // ── ABUSE PROTECTION ─────────────────────────────────────────────────────
+  // Layer 1: Honeypot — bots fill hidden field, humans don't
   const hp=document.getElementById('s-hp');
   if(hp&&hp.value.trim()){
     // Bot detected — silently pretend success
@@ -4109,15 +4110,26 @@ async function submitSuggestion(){
     return;
   }
 
-  // Rate limiting — max 3 submissions per hour from same browser
+  // Layer 2: Frontend rate limit (3 per hour, 10 per day per browser)
+  // NOTE: This is a convenience limit only — a determined user can bypass it
+  // by clearing localStorage or using incognito. The real enforcement is the
+  // Supabase database function (Layer 3 below).
+  // RECOMMENDED: For stronger protection add Cloudflare Turnstile (free CAPTCHA)
   const RL_KEY='sug_timestamps';
   const now=Date.now();
   const hour=60*60*1000;
+  const day=24*hour;
   let times=[];
   try{times=JSON.parse(localStorage.getItem(RL_KEY)||'[]');}catch(e){}
-  times=times.filter(t=>now-t<hour); // keep only last hour
-  if(times.length>=3){
-    alert('You\'ve submitted several suggestions recently. Please wait a bit before submitting again.');
+  times=times.filter(t=>now-t<day); // keep last 24 hours
+  const lastHour=times.filter(t=>now-t<hour);
+  if(lastHour.length>=3){
+    const waitMins=Math.ceil((times[times.length-3]+(hour)-now)/60000);
+    alert(`You've submitted 3 suggestions this hour. Please wait about ${waitMins} minute${waitMins!==1?'s':''} before submitting again.`);
+    return;
+  }
+  if(times.length>=10){
+    alert('You\'ve reached the daily suggestion limit. Please try again tomorrow.');
     return;
   }
 
@@ -4165,9 +4177,10 @@ async function submitSuggestion(){
       body:JSON.stringify(payload)
     });
     if(!res.ok) throw new Error(await res.text());
-    // Record this submission for rate limiting
+    // Record submission for frontend rate limiting
     times.push(now);
-    localStorage.setItem(RL_KEY,JSON.stringify(times));
+    // Only keep last 24 hours worth
+    localStorage.setItem(RL_KEY,JSON.stringify(times.filter(t=>now-t<day)));
     closeSuggest();
     alert('✓ Suggestion submitted! The shop owner will review it.');
     // Refresh badge count
