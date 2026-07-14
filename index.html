@@ -113,7 +113,6 @@
   .cf-label{font-family:'Barlow Condensed',sans-serif;font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
   .pn-cell{font-family:'Barlow Condensed',sans-serif;font-size:.85rem;font-weight:700;color:var(--text);letter-spacing:.02em}
   .pn-na{color:var(--border)}
-  .app-cell{font-size:.76rem;color:var(--muted);max-width:260px;line-height:1.4}
 
   .btn-add{background:var(--accent);border:none;color:#0f1114;font-family:'Barlow Condensed',sans-serif;font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:9px 16px;border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0;align-self:flex-end}
   .btn-add:hover{opacity:.88}
@@ -350,8 +349,6 @@
       <th>Purolator #</th>
       <th>NAPA #</th>
       <th>Torque (ft-lb)</th>
-      <th>Torque (Nm)</th>
-      <th>Application / OEM #</th>
     </tr></thead>
     <tbody id="cf-body"></tbody>
   </table>
@@ -4468,8 +4465,6 @@ function renderCF(){
     <td>${pn(r.puro)}</td>
     <td>${pn(r.napa)}</td>
     <td style="color:var(--accent);font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:800">${esc(r.torq)}</td>
-    <td style="color:var(--muted);font-size:.82rem">${esc(r.nm)}</td>
-    <td><span class="app-cell">${esc(r.app)}</span></td>
   </tr>`).join('');
 }
 
