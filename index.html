@@ -3672,7 +3672,7 @@ function renderTable(){
     const amsoilMake=encodeURIComponent(r.make.split('/')[0].trim());
     const amsoilModel=encodeURIComponent(r.model.split('(')[0].trim());
     const amsoilYear=r.year?r.year.split('-')[0].trim():'';
-    const pennzoilUrl='https://www.pennzoil.com/en_us/oil-selector.html#iframe=L2VuX3VzL29pbC1zZWxlY3Rvci9famNyX2NvbnRlbnQvcm9vdC9tYWluL3NlY3Rpb24vd2ViX2NvbXBvbmVudC9saW5rcy9pdGVtMC5zdHJlYW0vMTc1MjUzMzY0MDUxOC81YTY4YjQ2YTk0ZDMyMDEzMmExM2I1MzRjMTMxNjEwZmM1NjJkYjRjL2lmcmFtZS0xNjEyMTkuaHRtbCMvdXMvZW4tdXM%3D';
+    const pennzoilUrl='https://www.pennzoil.com/en_us/oil-selector.html';
     const amsoilUrl=`https://www.amsoil.com/lookup/auto-and-light-truck/`;
     return`<tr>
       <td><span class="td-model">${esc(r.make)} ${esc(r.model)}</span>${isCustom?'<span class="custom-tag">CUSTOM</span>':''}</td>
